@@ -5,23 +5,26 @@ import java.util.concurrent.BlockingQueue;
 public class Worker implements Runnable {
 
     private final BlockingQueue<Task> taskQueue;
+    private final TaskScheduler scheduler;
 
-    public Worker(BlockingQueue<Task> taskQueue) {
+    public Worker(BlockingQueue<Task> taskQueue, TaskScheduler scheduler) {
         this.taskQueue = taskQueue;
+        this.scheduler = scheduler;
     }
 
     @Override
     public void run() {
         try {
-            while (true) {
-                Task task = taskQueue.take(); // Thread-safe blocking call
-                task.run();
+            while (scheduler.isRunning() || !taskQueue.isEmpty()) {
+                Task task = taskQueue.poll();
+                if (task != null) {
+                    task.run();
+                    Metrics.incrementCompletedTasks();
+                }
             }
-        } catch (InterruptedException e) {
+        } catch (Exception e) {
             Thread.currentThread().interrupt();
-            System.out.println(
-                Thread.currentThread().getName() + " stopped."
-            );
         }
+        System.out.println(Thread.currentThread().getName() + " stopped.");
     }
 }

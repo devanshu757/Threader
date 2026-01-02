@@ -2,24 +2,43 @@ package com.threader;
 
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.TimeUnit;
 
 public class TaskScheduler {
 
     private final BlockingQueue<Task> taskQueue;
+    private final Thread[] workers;
+    private volatile boolean isRunning = true;
 
     public TaskScheduler(int workerCount) {
-        taskQueue = new LinkedBlockingQueue<>();
+        taskQueue = new java.util.concurrent.PriorityBlockingQueue<>();
 
-        for (int i = 1; i <= workerCount; i++) {
-            Thread workerThread = new Thread(
-                    new Worker(taskQueue),
-                    "Worker-" + i
+        workers = new Thread[workerCount];
+
+        for (int i = 0; i < workerCount; i++) {
+            workers[i] = new Thread(
+                    new Worker(taskQueue, this),
+                    "Worker-" + (i + 1)
             );
-            workerThread.start();
+            workers[i].start();
         }
     }
 
+    public boolean isRunning() {
+        return isRunning;
+    }
+
     public void submitTask(Task task) {
-        taskQueue.offer(task);
+        if (isRunning) {
+            taskQueue.offer(task);
+        }
+    }
+
+    public void shutdown() {
+        isRunning = false;
+        for (Thread worker : workers) {
+            worker.interrupt();
+        }
+        System.out.println("Scheduler shutdown initiated.");
     }
 }
